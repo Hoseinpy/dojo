@@ -1,92 +1,160 @@
+use anyhow::{Error, Ok, Result};
+use chrono::{Local, TimeZone};
+use colored::Colorize;
+use sqlx::{Pool, Sqlite, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use std::{
-    sync::{Arc, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
+    env::{self},
+    fs,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-fn get_timestamp() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
+pub fn get_timestamp() -> u64 {
+    match SystemTime::now().duration_since(UNIX_EPOCH).ok() {
+        Some(v) => v.as_secs(),
+        None => 0,
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct Todo {
-    id: u64,
-    message: String,
-    is_done: bool,
-    created_at: u64,
+pub async fn init_db_pool(test_mode: bool) -> Result<Pool<Sqlite>> {
+    // set variables
+    let database_url = if test_mode {
+        format!(
+            "sqlite:file:memdb_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4()
+        )
+    } else {
+        env::var("DATABASE_URL")?
+    };
+
+    // create dir /db if not in test mode
+    if !test_mode {
+        fs::create_dir_all("db/")?;
+    }
+
+    // create database if not exists
+    if !test_mode && !Sqlite::database_exists(&database_url).await? {
+        Sqlite::create_database(&database_url).await?;
+    }
+
+    // create pool
+    let pool = SqlitePoolOptions::new()
+        .idle_timeout(Duration::from_secs(10))
+        .max_connections(10)
+        .acquire_timeout(Duration::from_secs(5))
+        .max_lifetime(Duration::from_secs(30))
+        .connect(&database_url)
+        .await?;
+
+    // run migrations
+    let _ = sqlx::migrate!("./migrations").run(&pool).await;
+
+    Ok(pool)
 }
 
-pub struct TodoOptions;
-
-impl TodoOptions {
-    pub fn select_action_by_option(option_name: &str, todos: Arc<Mutex<Vec<Todo>>>) {
-        match option_name {
-            "list" => TodoOptions::todo_list(todos),
-            "add" => TodoOptions::add_todo(todos),
-            "done" => TodoOptions::done_todo(todos),
-            _ => (),
+pub fn readable_datetime(timestamp: u64) -> Result<String> {
+    let datetime = match Local.timestamp_opt(timestamp as i64, 0).single() {
+        Some(v) => v,
+        None => {
+            return Err(Error::msg("datetime is none"));
         }
+    };
+    Ok(datetime.to_rfc2822())
+}
+
+pub fn print_help() {
+    println!(
+        "\n{}\n{}\n",
+        "🧭 AVAILABLE COMMANDS:".bold().cyan(),
+        "──────────────────────────────────────────────".dimmed()
+    );
+
+    println!(
+        "{}\n  {} {}\n  {} Show all available todo items\n",
+        "📋 list".bold().underline(),
+        "Usage:".bold(),
+        "dojo list".green(),
+        "Description:".bold(),
+    );
+
+    println!(
+        "{}\n  {} {}\n  {} Add a new todo item to the list\n",
+        "➕ add".bold().underline(),
+        "Usage:".bold(),
+        "dojo add <message>".green(),
+        "Description:".bold(),
+    );
+
+    println!(
+        "{}\n  {} {}\n  {} Mark one or more todos as completed\n",
+        "✅ done".bold().underline(),
+        "Usage:".bold(),
+        "dojo done <id>".green(),
+        "Description:".bold(),
+    );
+
+    println!(
+        "{}\n  {} {}\n  {} Delete one or more todos\n",
+        "🗑️ delete".bold().underline(),
+        "Usage:".bold(),
+        "dojo delete <id>".green(),
+        "Description:".bold(),
+    );
+
+    println!(
+        "{}\n  {} {}\n  {} Show program current version\n",
+        "🔢 version".bold().underline(),
+        "Usage:".bold(),
+        "dojo version".green(),
+        "Description:".bold(),
+    );
+}
+
+pub fn get_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use dotenvy::dotenv;
+
+    use super::*;
+
+    #[test]
+    fn test_get_timestamp() {
+        assert!(get_timestamp() > 0)
     }
 
-    fn todo_list(todos: Arc<Mutex<Vec<Todo>>>) {
-        let todos = todos.lock().unwrap();
-        if todos.is_empty() {
-            println!("list was empty");
-            return;
-        }
-        for todo in todos.iter() {
-            println!(
-                "----------\n{}\ntask: {}\nis_done: {}\ncreated_at: {}\n----------",
-                todo.id, todo.message, todo.is_done, todo.created_at
-            )
-        }
+    #[test]
+    fn test_readable_datetime() {
+        let timestamp = get_timestamp();
+        assert!(readable_datetime(timestamp).is_ok())
     }
-    fn add_todo(todos: Arc<Mutex<Vec<Todo>>>) {
-        let mut todos = todos.lock().unwrap();
-        println!("give me todo message:");
-        let mut todo_message_input = String::new();
-        std::io::stdin()
-            .read_line(&mut todo_message_input)
-            .expect("failed to read line");
 
-        let id = match todos.last() {
-            Some(v) => v.id + 1,
-            None => 1,
-        };
-        let todo = Todo {
-            id: id,
-            message: todo_message_input.trim().to_string(),
-            is_done: false,
-            created_at: get_timestamp(),
-        };
-        todos.push(todo);
-
-        println!("successfully todo added");
-        return;
+    #[test]
+    fn test_get_help_text() {
+        print_help();
     }
-    fn done_todo(todos: Arc<Mutex<Vec<Todo>>>) {
-        let mut todos = todos.lock().unwrap();
-        println!("give me todo id:");
-        let mut todo_id_input = String::new();
-        let parsed_todo_id_input = match std::io::stdin().read_line(&mut todo_id_input) {
-            Ok(_) => todo_id_input.trim().parse::<u64>().unwrap(),
-            Err(e) => {
-                println!("failed to read line. error: {e:?}");
-                return;
-            }
-        };
 
-        for todo in todos.iter_mut() {
-            if todo.id == parsed_todo_id_input {
-                todo.is_done = true;
-                println!("successfully marked as read");
-                return;
-            }
-        }
+    #[test]
+    fn test_get_version() {
+        assert!(!get_version().is_empty())
+    }
 
-        println!("cannot found entered todo id!!");
-        return;
+    #[tokio::test]
+    async fn test_init_db_pool() {
+        dotenv().ok();
+        assert!(init_db_pool(true).await.is_ok())
+    }
+
+    #[tokio::test]
+    async fn test_db_connection() {
+        dotenv().ok();
+        let db_pool = init_db_pool(true).await.unwrap();
+        let row: (i64,) = sqlx::query_as("SELECT 1")
+            .fetch_one(&db_pool)
+            .await
+            .unwrap();
+
+        assert_eq!(row.0, 1);
     }
 }
