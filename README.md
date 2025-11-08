@@ -36,7 +36,7 @@ To install from source:
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/dojo.git
+git clone https://github.com/Hoseinpy/dojo.git
 cd dojo
 
 # Build and run (development mode)
