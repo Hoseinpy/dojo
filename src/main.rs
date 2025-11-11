@@ -9,6 +9,8 @@ use dotenvy::dotenv;
 
 mod helpers;
 mod models;
+#[cfg(test)]
+mod tests;
 
 #[tokio::main]
 async fn main() {
@@ -34,9 +36,7 @@ async fn main() {
     }
     match args[0].as_str() {
         "add" => {
-            if let Err(e) =
-                TodoOptions::select_action_by_option("add", db_pool.clone(), &args[1..]).await
-            {
+            if let Err(e) = TodoOptions::add_todo(db_pool.clone(), &args[1..]).await {
                 println!(
                     "{}",
                     format!("failed to handle add. error: {e:?}").bold().red()
@@ -44,9 +44,7 @@ async fn main() {
             }
         }
         "done" => {
-            if let Err(e) =
-                TodoOptions::select_action_by_option("done", db_pool.clone(), &args[1..]).await
-            {
+            if let Err(e) = TodoOptions::done_todo(db_pool.clone(), &args[1..]).await {
                 println!(
                     "{}",
                     format!("failed to handle done. error: {e:?}").bold().red()
@@ -54,9 +52,7 @@ async fn main() {
             }
         }
         "list" => {
-            if let Err(e) =
-                TodoOptions::select_action_by_option("list", db_pool.clone(), &args[1..]).await
-            {
+            if let Err(e) = TodoOptions::todo_list(db_pool.clone()).await {
                 println!(
                     "{}",
                     format!("failed to handle list. error: {e:?}").bold().red()
@@ -64,9 +60,7 @@ async fn main() {
             }
         }
         "delete" => {
-            if let Err(e) =
-                TodoOptions::select_action_by_option("delete", db_pool.clone(), &args[1..]).await
-            {
+            if let Err(e) = TodoOptions::delete_todo(db_pool.clone(), &args[1..]).await {
                 println!(
                     "{}",
                     format!("failed to handle delete. error: {e:?}")
