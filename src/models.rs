@@ -22,8 +22,7 @@ impl TodoOptions {
             .await?;
 
         if todos.is_empty() {
-            println!("📭  The list is empty. Try adding a new task!");
-            return Ok(());
+            return Err(Error::msg("📭  The list is empty. Try adding a new task!"));
         }
 
         println!("\n{}", "📝 TODO LIST".bold().underline().cyan());
@@ -57,9 +56,7 @@ impl TodoOptions {
     }
     pub async fn add_todo(db_pool: Arc<Pool<Sqlite>>, args: &[String]) -> Result<()> {
         if args.is_empty() {
-            return Err(Error::msg(
-                "Please add todo message like: dojo add task1".bold().red(),
-            ));
+            return Err(Error::msg("Please add todo message like: dojo add task1"));
         }
         let message = args.join(" ").trim().to_string();
 
@@ -77,24 +74,14 @@ impl TodoOptions {
     }
     pub async fn done_todo(db_pool: Arc<Pool<Sqlite>>, args: &[String]) -> Result<()> {
         if args.is_empty() {
-            return Err(Error::msg(
-                "Please add todos id like: dojo done 1".bold().red(),
-            ));
+            return Err(Error::msg("Please add todos id like: dojo done 1"));
         }
 
         for arg in args {
             // update db
             let parsed_todo_id = match arg.parse::<i32>() {
                 Ok(v) => v,
-                Err(_) => {
-                    println!(
-                        "{}",
-                        String::from("error: done operation args most be i32. like: dojo done 1")
-                            .bold()
-                            .red()
-                    );
-                    continue;
-                }
+                Err(_) => continue,
             };
             sqlx::query("UPDATE todo SET is_done = 1 WHERE id = $1")
                 .bind(parsed_todo_id)
@@ -107,26 +94,14 @@ impl TodoOptions {
     }
     pub async fn delete_todo(db_pool: Arc<Pool<Sqlite>>, args: &[String]) -> Result<()> {
         if args.is_empty() {
-            return Err(Error::msg(
-                "Please add todos id like: dojo delete 1".bold().red(),
-            ));
+            return Err(Error::msg("Please add todos id like: dojo delete 1"));
         }
 
         for arg in args {
             // delete from db
             let parsed_todo_id = match arg.parse::<i32>() {
                 Ok(v) => v,
-                Err(_) => {
-                    println!(
-                        "{}",
-                        String::from(
-                            "error: delete operation args most be i32. like: dojo delete 1"
-                        )
-                        .bold()
-                        .red()
-                    );
-                    continue;
-                }
+                Err(_) => continue,
             };
             sqlx::query("DELETE FROM todo WHERE id = $1")
                 .bind(parsed_todo_id)

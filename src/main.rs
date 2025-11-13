@@ -1,4 +1,4 @@
-use std::{env, sync::Arc};
+use std::{env, process, sync::Arc};
 
 use crate::{
     helpers::{get_version, init_db_pool, print_help},
@@ -9,6 +9,7 @@ use dotenvy::dotenv;
 
 mod helpers;
 mod models;
+
 #[cfg(test)]
 mod tests;
 
@@ -18,63 +19,46 @@ async fn main() {
     dotenv().ok();
 
     // init database pool
-    let db_pool = Arc::new(
-        init_db_pool(false)
-            .await
-            .unwrap_or_else(|_| panic!("{}", "failed to create db pool".bold().red())),
-    );
+    let db_pool = Arc::new(init_db_pool(false).await.unwrap_or_else(|_| {
+        eprintln!("{}", String::from("failed to create db pool").red().bold());
+        process::exit(1)
+    }));
 
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() {
-        println!(
+        eprintln!(
             "{}",
-            String::from("invalid usage. run 'dojo help' for help")
-                .bold()
-                .red()
+            String::from("invalid usage. run 'dojo help'").bold().red()
         );
-        return;
+        process::exit(1)
     }
+
     match args[0].as_str() {
         "add" => {
             if let Err(e) = TodoOptions::add_todo(db_pool.clone(), &args[1..]).await {
-                println!(
-                    "{}",
-                    format!("failed to handle add. error: {e:?}").bold().red()
-                );
+                eprintln!("{}", format!("{e:?}").bold().red());
             }
         }
         "done" => {
             if let Err(e) = TodoOptions::done_todo(db_pool.clone(), &args[1..]).await {
-                println!(
-                    "{}",
-                    format!("failed to handle done. error: {e:?}").bold().red()
-                );
+                eprintln!("{}", format!("{e:?}").bold().red());
             }
         }
         "list" => {
             if let Err(e) = TodoOptions::todo_list(db_pool.clone()).await {
-                println!(
-                    "{}",
-                    format!("failed to handle list. error: {e:?}").bold().red()
-                );
+                eprintln!("{}", format!("{e:?}").bold().red());
             }
         }
         "delete" => {
             if let Err(e) = TodoOptions::delete_todo(db_pool.clone(), &args[1..]).await {
-                println!(
-                    "{}",
-                    format!("failed to handle delete. error: {e:?}")
-                        .bold()
-                        .red()
-                );
+                eprintln!("{}", format!("{e:?}").bold().red());
             }
         }
-        "help" | "-h" | "--help" => print_help(),
         "version" => {
             let version = get_version();
             println!("Version: {}", version)
         }
-        _ => (),
+        _ => print_help(),
     }
 
     db_pool.close().await;

@@ -1,6 +1,6 @@
 use anyhow::{Error, Ok, Result};
 use chrono::{Local, TimeZone};
-use colored::Colorize;
+use colored::{ColoredString, Colorize};
 use sqlx::{Pool, Sqlite, migrate::MigrateDatabase, sqlite::SqlitePoolOptions};
 use std::{
     env::{self},
@@ -61,6 +61,17 @@ pub fn readable_datetime(timestamp: u64) -> Result<String> {
     Ok(datetime.to_rfc2822())
 }
 
+pub fn print_help_text(command_name: ColoredString, description: &str, usage: String) {
+    println!(
+        "{}\n  {} {}\n  {} {}\n",
+        command_name,
+        "Usage:".bold(),
+        usage,
+        "Description:".bold(),
+        description
+    );
+}
+
 pub fn print_help() {
     println!(
         "\n{}\n{}\n",
@@ -68,44 +79,39 @@ pub fn print_help() {
         "──────────────────────────────────────────────".dimmed()
     );
 
-    println!(
-        "{}\n  {} {}\n  {} Show all available todo items\n",
-        "📋 list".bold().underline(),
-        "Usage:".bold(),
-        "dojo list".green(),
-        "Description:".bold(),
+    // list command
+    print_help_text(
+        String::from("List").green().bold().underline(),
+        "show available todos",
+        String::from("dojo list"),
     );
 
-    println!(
-        "{}\n  {} {}\n  {} Add a new todo item to the list\n",
-        "➕ add".bold().underline(),
-        "Usage:".bold(),
-        "dojo add <message>".green(),
-        "Description:".bold(),
+    // add command
+    print_help_text(
+        String::from("Add").green().bold().underline(),
+        "add new todo",
+        String::from("dojo add <message>"),
     );
 
-    println!(
-        "{}\n  {} {}\n  {} Mark one or more todos as completed\n",
-        "✅ done".bold().underline(),
-        "Usage:".bold(),
-        "dojo done <id>".green(),
-        "Description:".bold(),
+    // done command
+    print_help_text(
+        String::from("Done").green().bold().underline(),
+        "mark todo as done",
+        String::from("dojo done <ids>"),
     );
 
-    println!(
-        "{}\n  {} {}\n  {} Delete one or more todos\n",
-        "🗑️ delete".bold().underline(),
-        "Usage:".bold(),
-        "dojo delete <id>".green(),
-        "Description:".bold(),
+    // delete command
+    print_help_text(
+        String::from("Delete").green().bold().underline(),
+        "remove todo",
+        String::from("dojo delete <ids>"),
     );
 
-    println!(
-        "{}\n  {} {}\n  {} Show program current version\n",
-        "🔢 version".bold().underline(),
-        "Usage:".bold(),
-        "dojo version".green(),
-        "Description:".bold(),
+    // version command
+    print_help_text(
+        String::from("Version").green().bold().underline(),
+        "show program version",
+        String::from("dojo version"),
     );
 }
 
